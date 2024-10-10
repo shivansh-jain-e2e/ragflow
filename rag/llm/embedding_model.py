@@ -18,7 +18,6 @@ from typing import Optional
 import threading
 import requests
 from huggingface_hub import snapshot_download
-from openai.lib.azure import AzureOpenAI
 from zhipuai import ZhipuAI
 import os
 from abc import ABC
@@ -137,6 +136,7 @@ class LocalAIEmbed(Base):
 
 class AzureEmbed(OpenAIEmbed):
     def __init__(self, key, model_name, **kwargs):
+        from openai.lib.azure import AzureOpenAI
         self.client = AzureOpenAI(api_key=key, azure_endpoint=kwargs["base_url"], api_version="2024-02-01")
         self.model_name = model_name
 
@@ -443,7 +443,7 @@ class BedrockEmbed(Base):
 
         response = self.client.invoke_model(modelId=self.model_name, body=json.dumps(body))
         model_response = json.loads(response["body"].read())
-        embeddings.extend([model_response["embedding"]])
+        embeddings.extend(model_response["embedding"])
 
         return np.array(embeddings), token_count
 
@@ -678,3 +678,40 @@ class VoyageEmbed(Base):
             texts=text, model=self.model_name, input_type="query"
             )
         return np.array(res.embeddings), res.total_tokens
+
+
+class HuggingFaceEmbed(Base):
+    def __init__(self, key, model_name, base_url=None):
+        if not model_name:
+            raise ValueError("Model name cannot be None")
+        self.key = key
+        self.model_name = model_name
+        self.base_url = base_url or "http://127.0.0.1:8080"
+
+    def encode(self, texts: list, batch_size=32):
+        embeddings = []
+        for text in texts:
+            response = requests.post(
+                f"{self.base_url}/embed",
+                json={"inputs": text},
+                headers={'Content-Type': 'application/json'}
+            )
+            if response.status_code == 200:
+                embedding = response.json()
+                embeddings.append(embedding[0])
+            else:
+                raise Exception(f"Error: {response.status_code} - {response.text}")
+        return np.array(embeddings), sum([num_tokens_from_string(text) for text in texts])
+
+    def encode_queries(self, text):
+        response = requests.post(
+            f"{self.base_url}/embed",
+            json={"inputs": text},
+            headers={'Content-Type': 'application/json'}
+        )
+        if response.status_code == 200:
+            embedding = response.json()
+            return np.array(embedding[0]), num_tokens_from_string(text)
+        else:
+            raise Exception(f"Error: {response.status_code} - {response.text}")
+
