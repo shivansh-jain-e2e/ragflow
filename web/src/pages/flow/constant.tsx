@@ -3,18 +3,21 @@ import { ReactComponent as ArXivIcon } from '@/assets/svg/arxiv.svg';
 import { ReactComponent as baiduFanyiIcon } from '@/assets/svg/baidu-fanyi.svg';
 import { ReactComponent as BaiduIcon } from '@/assets/svg/baidu.svg';
 import { ReactComponent as BingIcon } from '@/assets/svg/bing.svg';
+import { ReactComponent as ConcentratorIcon } from '@/assets/svg/concentrator.svg';
 import { ReactComponent as DeepLIcon } from '@/assets/svg/deepl.svg';
 import { ReactComponent as DuckIcon } from '@/assets/svg/duck.svg';
 import { ReactComponent as ExeSqlIcon } from '@/assets/svg/exesql.svg';
 import { ReactComponent as GithubIcon } from '@/assets/svg/github.svg';
 import { ReactComponent as GoogleScholarIcon } from '@/assets/svg/google-scholar.svg';
 import { ReactComponent as GoogleIcon } from '@/assets/svg/google.svg';
+import { ReactComponent as Jin10Icon } from '@/assets/svg/jin10.svg';
 import { ReactComponent as KeywordIcon } from '@/assets/svg/keyword.svg';
 import { ReactComponent as PubMedIcon } from '@/assets/svg/pubmed.svg';
 import { ReactComponent as QWeatherIcon } from '@/assets/svg/qweather.svg';
 import { ReactComponent as SwitchIcon } from '@/assets/svg/switch.svg';
 import { ReactComponent as WenCaiIcon } from '@/assets/svg/wencai.svg';
 import { ReactComponent as WikipediaIcon } from '@/assets/svg/wikipedia.svg';
+import { ReactComponent as YahooFinanceIcon } from '@/assets/svg/yahoo-finance.svg';
 
 import { variableEnabledFieldMap } from '@/constants/chat';
 import i18n from '@/locales/config';
@@ -63,6 +66,9 @@ export enum Operator {
   Switch = 'Switch',
   WenCai = 'WenCai',
   AkShare = 'AkShare',
+  YahooFinance = 'YahooFinance',
+  Jin10 = 'Jin10',
+  Concentrator = 'Concentrator',
 }
 
 export const operatorIconMap = {
@@ -91,6 +97,9 @@ export const operatorIconMap = {
   [Operator.Switch]: SwitchIcon,
   [Operator.WenCai]: WenCaiIcon,
   [Operator.AkShare]: AkShareIcon,
+  [Operator.YahooFinance]: YahooFinanceIcon,
+  [Operator.Jin10]: Jin10Icon,
+  [Operator.Concentrator]: ConcentratorIcon,
 };
 
 export const operatorMap: Record<
@@ -202,6 +211,16 @@ export const operatorMap: Record<
   [Operator.Switch]: { backgroundColor: '#dbaff6' },
   [Operator.WenCai]: { backgroundColor: '#faac5b' },
   [Operator.AkShare]: { backgroundColor: '#8085f5' },
+  [Operator.YahooFinance]: { backgroundColor: '#b474ff' },
+  [Operator.Jin10]: { backgroundColor: '#a0b9f8' },
+  [Operator.Concentrator]: {
+    backgroundColor: '#32d2a3',
+    color: 'white',
+    width: 70,
+    height: 70,
+    fontSize: 10,
+    iconFontSize: 16,
+  },
 };
 
 export const componentMenuList = [
@@ -231,6 +250,9 @@ export const componentMenuList = [
   },
   {
     name: Operator.Switch,
+  },
+  {
+    name: Operator.Concentrator,
   },
   {
     name: Operator.DuckDuckGo,
@@ -276,6 +298,12 @@ export const componentMenuList = [
   },
   {
     name: Operator.AkShare,
+  },
+  {
+    name: Operator.YahooFinance,
+  },
+  {
+    name: Operator.Jin10,
   },
 ];
 
@@ -420,6 +448,25 @@ export const initialWenCaiValues = { top_n: 20, query_type: 'stock' };
 
 export const initialAkShareValues = { top_n: 10 };
 
+export const initialYahooFinanceValues = {
+  info: true,
+  history: false,
+  financials: false,
+  balance_sheet: false,
+  cash_flow_statement: false,
+  news: true,
+};
+
+export const initialJin10Values = {
+  type: 'flash',
+  secret_key: 'xxx',
+  flash_type: '1',
+  contain: '',
+  filter: '',
+};
+
+export const initialConcentratorValues = {};
+
 export const CategorizeAnchorPointPositions = [
   { top: 1, right: 34 },
   { top: 8, right: 18 },
@@ -492,6 +539,9 @@ export const RestrictedUpstreamMap = {
   [Operator.Switch]: [Operator.Begin],
   [Operator.WenCai]: [Operator.Begin],
   [Operator.AkShare]: [Operator.Begin],
+  [Operator.YahooFinance]: [Operator.Begin],
+  [Operator.Jin10]: [Operator.Begin],
+  [Operator.Concentrator]: [Operator.Begin],
 };
 
 export const NodeMap = {
@@ -518,8 +568,11 @@ export const NodeMap = {
   [Operator.QWeather]: 'ragNode',
   [Operator.ExeSQL]: 'ragNode',
   [Operator.Switch]: 'categorizeNode',
+  [Operator.Concentrator]: 'logicNode',
   [Operator.WenCai]: 'ragNode',
   [Operator.AkShare]: 'ragNode',
+  [Operator.YahooFinance]: 'ragNode',
+  [Operator.Jin10]: 'ragNode',
 };
 
 export const LanguageOptions = [
@@ -2688,3 +2741,12 @@ export const WenCaiQueryTypeOptions = [
   'lccp',
   'foreign_exchange',
 ];
+
+export const Jin10TypeOptions = ['flash', 'calendar', 'symbols', 'news'];
+export const Jin10FlashTypeOptions = new Array(5)
+  .fill(1)
+  .map((x, idx) => (idx + 1).toString());
+export const Jin10CalendarTypeOptions = ['cj', 'qh', 'hk', 'us'];
+export const Jin10CalendarDatashapeOptions = ['data', 'event', 'holiday'];
+export const Jin10SymbolsTypeOptions = ['GOODS', 'FOREX', 'FUTURE', 'CRYPTO'];
+export const Jin10SymbolsDatatypeOptions = ['symbols', 'quotes'];
