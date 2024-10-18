@@ -37,7 +37,9 @@ from graphrag.mind_map_extractor import MindMapExtractor
 def set_conversation():
     req = request.json
     conv_id = req.get("conversation_id")
-    if conv_id:
+    is_new = req.get("is_new")
+    del req["is_new"]
+    if not is_new:
         del req["conversation_id"]
         try:
             if not ConversationService.update_by_id(conv_id, req):
@@ -56,7 +58,7 @@ def set_conversation():
         if not e:
             return get_data_error_result(retmsg="Dialog not found")
         conv = {
-            "id": get_uuid(),
+            "id": conv_id,
             "dialog_id": req["dialog_id"],
             "name": req.get("name", "New conversation"),
             "message": [{"role": "assistant", "content": dia.prompt_config["prologue"]}]
@@ -228,8 +230,9 @@ def tts():
 
     def stream_audio():
         try:
-            for chunk in tts_mdl.tts(text):
-                yield chunk
+            for txt in re.split(r"[，。/《》？；：！\n\r:;]+", text):
+                for chunk in tts_mdl.tts(txt):
+                    yield chunk
         except Exception as e:
             yield ("data:" + json.dumps({"retcode": 500, "retmsg": str(e),
                                          "data": {"answer": "**ERROR**: " + str(e)}},

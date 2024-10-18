@@ -454,6 +454,8 @@ def upload():
             doc["parser_id"] = ParserType.AUDIO.value
         if re.search(r"\.(ppt|pptx|pages)$", filename):
             doc["parser_id"] = ParserType.PRESENTATION.value
+        if re.search(r"\.(eml)$", filename):
+            doc["parser_id"] = ParserType.EMAIL.value
 
         doc_result = DocumentService.insert(doc)
         FileService.add_file_from_kb(doc, kb_folder["id"], kb.tenant_id)
@@ -478,7 +480,7 @@ def upload():
                 e, doc = DocumentService.get_by_id(doc["id"])
                 doc = doc.to_dict()
                 doc["tenant_id"] = tenant_id
-                bucket, name = File2DocumentService.get_minio_address(doc_id=doc["id"])
+                bucket, name = File2DocumentService.get_storage_address(doc_id=doc["id"])
                 queue_tasks(doc, bucket, name)
             except Exception as e:
                 return server_error_response(e)
@@ -640,7 +642,7 @@ def document_rm():
             if not tenant_id:
                 return get_data_error_result(retmsg="Tenant not found!")
 
-            b, n = File2DocumentService.get_minio_address(doc_id=doc_id)
+            b, n = File2DocumentService.get_storage_address(doc_id=doc_id)
 
             if not DocumentService.remove_document(doc, tenant_id):
                 return get_data_error_result(
@@ -679,8 +681,79 @@ def completion_faq():
 
     msg = []
     msg.append({"role": "user", "content": req["word"]})
+    if not msg[-1].get("id"): msg[-1]["id"] = get_uuid()
+    message_id = msg[-1]["id"]
+
+    def fillin_conv(ans):
+        nonlocal conv, message_id
+        if not conv.reference:
+            conv.reference.append(ans["reference"])
+        else:
+            conv.reference[-1] = ans["reference"]
+        conv.message[-1] = {"role": "assistant", "content": ans["answer"], "id": message_id}
+        ans["id"] = message_id
 
     try:
+        if conv.source == "agent":
+            conv.message.append(msg[-1])
+            e, cvs = UserCanvasService.get_by_id(conv.dialog_id)
+            if not e:
+                return server_error_response("canvas not found.")
+
+            if not isinstance(cvs.dsl, str):
+                cvs.dsl = json.dumps(cvs.dsl, ensure_ascii=False)
+
+            if not conv.reference:
+                conv.reference = []
+            conv.message.append({"role": "assistant", "content": "", "id": message_id})
+            conv.reference.append({"chunks": [], "doc_aggs": []})
+
+            final_ans = {"reference": [], "doc_aggs": []}
+            canvas = Canvas(cvs.dsl, objs[0].tenant_id)
+
+            canvas.messages.append(msg[-1])
+            canvas.add_user_input(msg[-1]["content"])
+            answer = canvas.run(stream=False)
+
+            assert answer is not None, "Nothing. Is it over?"
+
+            data_type_picture = {
+                "type": 3,
+                "url": "base64 content"
+            }
+            data = [
+                {
+                    "type": 1,
+                    "content": ""
+                }
+            ]
+            final_ans["content"] = "\n".join(answer["content"]) if "content" in answer else ""
+            canvas.messages.append({"role": "assistant", "content": final_ans["content"], "id": message_id})
+            if final_ans.get("reference"):
+                canvas.reference.append(final_ans["reference"])
+            cvs.dsl = json.loads(str(canvas))
+
+            ans = {"answer": final_ans["content"], "reference": final_ans.get("reference", [])}
+            data[0]["content"] += re.sub(r'##\d\$\$', '', ans["answer"])
+            fillin_conv(ans)
+            API4ConversationService.append_message(conv.id, conv.to_dict())
+
+            chunk_idxs = [int(match[2]) for match in re.findall(r'##\d\$\$', ans["answer"])]
+            for chunk_idx in chunk_idxs[:1]:
+                if ans["reference"]["chunks"][chunk_idx]["img_id"]:
+                    try:
+                        bkt, nm = ans["reference"]["chunks"][chunk_idx]["img_id"].split("-")
+                        response = STORAGE_IMPL.get(bkt, nm)
+                        data_type_picture["url"] = base64.b64encode(response).decode('utf-8')
+                        data.append(data_type_picture)
+                        break
+                    except Exception as e:
+                        return server_error_response(e)
+
+            response = {"code": 200, "msg": "success", "data": data}
+            return response
+
+        # ******************For dialog******************
         conv.message.append(msg[-1])
         e, dia = DialogService.get_by_id(conv.dialog_id)
         if not e:
@@ -689,16 +762,8 @@ def completion_faq():
 
         if not conv.reference:
             conv.reference = []
-        conv.message.append({"role": "assistant", "content": ""})
+        conv.message.append({"role": "assistant", "content": "", "id": message_id})
         conv.reference.append({"chunks": [], "doc_aggs": []})
-
-        def fillin_conv(ans):
-            nonlocal conv
-            if not conv.reference:
-                conv.reference.append(ans["reference"])
-            else:
-                conv.reference[-1] = ans["reference"]
-            conv.message[-1] = {"role": "assistant", "content": ans["answer"]}
 
         data_type_picture = {
             "type": 3,

@@ -51,6 +51,7 @@ from api.utils.api_utils import get_json_result
 from rag.utils.storage_factory import STORAGE_IMPL
 from api.utils.file_utils import filename_type, thumbnail, get_project_base_directory
 from api.utils.web_utils import html2pdf, is_valid_url
+from api.contants import IMG_BASE64_PREFIX
 
 
 @manager.route('/upload', methods=['POST'])
@@ -139,6 +140,8 @@ def web_crawl():
             doc["parser_id"] = ParserType.AUDIO.value
         if re.search(r"\.(ppt|pptx|pages)$", filename):
             doc["parser_id"] = ParserType.PRESENTATION.value
+        if re.search(r"\.(eml)$", filename):
+            doc["parser_id"] = ParserType.EMAIL.value
         DocumentService.insert(doc)
         FileService.add_file_from_kb(doc, kb_folder["id"], kb.tenant_id)
     except Exception as e:
@@ -207,6 +210,11 @@ def list_docs():
     try:
         docs, tol = DocumentService.get_by_kb_id(
             kb_id, page_number, items_per_page, orderby, desc, keywords)
+
+        for doc_item in docs:
+            if doc_item['thumbnail'] and not doc_item['thumbnail'].startswith(IMG_BASE64_PREFIX):
+                doc_item['thumbnail'] = f"/v1/document/image/{kb_id}-{doc_item['thumbnail']}"
+
         return get_json_result(data={"total": tol, "docs": docs})
     except Exception as e:
         return server_error_response(e)
@@ -297,7 +305,7 @@ def rm():
             if not tenant_id:
                 return get_data_error_result(retmsg="Tenant not found!")
 
-            b, n = File2DocumentService.get_minio_address(doc_id=doc_id)
+            b, n = File2DocumentService.get_storage_address(doc_id=doc_id)
 
             if not DocumentService.remove_document(doc, tenant_id):
                 return get_data_error_result(
@@ -342,7 +350,7 @@ def run():
                 e, doc = DocumentService.get_by_id(id)
                 doc = doc.to_dict()
                 doc["tenant_id"] = tenant_id
-                bucket, name = File2DocumentService.get_minio_address(doc_id=doc["id"])
+                bucket, name = File2DocumentService.get_storage_address(doc_id=doc["id"])
                 queue_tasks(doc, bucket, name)
 
         return get_json_result(data=True)
@@ -393,7 +401,7 @@ def get(doc_id):
         if not e:
             return get_data_error_result(retmsg="Document not found!")
 
-        b, n = File2DocumentService.get_minio_address(doc_id=doc_id)
+        b, n = File2DocumentService.get_storage_address(doc_id=doc_id)
         response = flask.make_response(STORAGE_IMPL.get(b, n))
 
         ext = re.search(r"\.([^.]+)$", doc.name)
